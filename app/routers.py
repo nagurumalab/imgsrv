@@ -1,5 +1,7 @@
 from typing import Annotated
+import os
 from fastapi import Path, UploadFile, APIRouter, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from config import settings
 import upload_url
@@ -17,11 +19,21 @@ async def generate_upload_link(expiry: int = 60) -> dict:
     return {"upload_url": UPLOAD_BASEURL + upload_id}
 
 
-@router.post(UPLOAD_BASEURL + "{upload-id}")
+@router.post(UPLOAD_BASEURL + "{upload_id}")
 async def upload_images(
     upload_id: Annotated[str, Path()], image_files: list[UploadFile]
 ):
+    uploaded_images = {}
     if not upload_url.is_valid_upload_id(upload_id):
         raise HTTPException(status_code=404, detail="Invalid Upload Url")
     for image_file in image_files:
-        image.save_image(input_image=image_file)
+        file_name = await image.save_image(input_image=image_file)
+        uploaded_images[image_file.filename] = os.path.basename(file_name)
+    return uploaded_images
+
+
+router.mount(
+    "/images",
+    StaticFiles(directory=settings.image_upload_basepath),
+    name="Uploaded Images",
+)

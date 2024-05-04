@@ -6,10 +6,10 @@ from PIL.ExifTags import TAGS
 from config import settings
 
 
-def save_image(input_image: UploadFile) -> str:
+async def save_image(input_image: UploadFile) -> str:
     file_name = settings.image_upload_basepath + f"/{input_image.filename}"
     with open(file_name, "wb") as output_image:
-        while content := input_image.read(1024):
+        while content := await input_image.read(1024):
             output_image.write(content)
     return file_name
 
