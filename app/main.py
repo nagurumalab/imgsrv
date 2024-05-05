@@ -1,8 +1,10 @@
 import logging
+from database import create_tables
 
 logging.basicConfig(
     format="'%(asctime)s - %(name)s - %(levelname)s - %(message)s'",
     datefmt="%m/%d/%Y %I:%M:%S %p",
+    level="DEBUG",
 )
 
 import uvicorn
@@ -22,6 +24,7 @@ app.mount(
     name="Uploaded Images",
 )
 
+create_tables()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)

@@ -1,26 +1,32 @@
+import logging
 from typing import Annotated
 import os
-from fastapi import Path, UploadFile, APIRouter, HTTPException, Depends
+from fastapi import Path, UploadFile, APIRouter, HTTPException, Depends, Body
 from sqlalchemy.orm import Session
 
 # from fastapi.staticfiles import StaticFiles
 # from fastapi import FileResponse
 # import aiofiles
 
-from .config import settings
-from .database import get_db
-from . import upload_url_helper, image_helper
+from config import settings
+from database import get_db
+import upload_url_helper
+import image_helper
 
 router = APIRouter()
 # public_router = APIRouter()
 
 UPLOAD_BASEURL = "/upload-images/"
 
+log = logging.getLogger(__name__)
+
 
 @router.post("/generate-upload-link")
-async def generate_upload_link(expiry: int = 60, db: Session = Depends(get_db)) -> dict:
+async def generate_upload_link(
+    expiry: Annotated[int, Body(embed=True)] = 60, db: Session = Depends(get_db)
+) -> dict:
     upload_id = upload_url_helper.get_unique_upload_id(db=db, expiry=expiry)
-    return {"upload_url": UPLOAD_BASEURL + upload_id}
+    return {"upload_id": upload_id}
 
 
 @router.post(UPLOAD_BASEURL + "{upload_id}")
@@ -33,8 +39,22 @@ async def upload_images(
     if not upload_url_helper.is_valid_upload_id(db=db, upload_id=upload_id):
         raise HTTPException(status_code=404, detail="Invalid Upload Url")
     for image_file in image_files:
-        file_name = await image_helper.save_image(input_image=image_file)
-        uploaded_images[image_file.filename] = os.path.basename(file_name)
+        log.debug("Processing file - %s", image_file.filename)
+        hashed_file_name = await image_helper.save_image(input_image=image_file)
+        if not hashed_file_name:
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+        hashed_image_id = os.path.basename(hashed_file_name)
+        image_helper.associate_image_to_upload(
+            db=db,
+            upload_id=upload_id,
+            image_id=hashed_image_id,
+            image_name=image_file.filename,
+        )
+        img_metadata = image_helper.get_image_metadata(image_file_name=hashed_file_name)
+        image_helper.save_image_metadata(
+            db=db, image_id=hashed_image_id, image_metadata=img_metadata
+        )
+        uploaded_images[image_file.filename] = hashed_image_id
     return uploaded_images
 
 
