@@ -3,6 +3,7 @@ from sqlalchemy.sql import text
 
 
 def get_top_camera_make(db: Session, n: int = 10) -> list[str]:
+    # Do a self join to get the make and model as one row
     query = text(
         """SELECT a.value || ' - ' ||b.value, COUNT(1) 
         FROM image_metadata a 
@@ -34,6 +35,7 @@ def get_top_image_format(db: Session, n: int = 1) -> list[str]:
 
 
 def get_image_upload_frequency(db: Session, n=30) -> dict[str, int]:
+    # date() func is used to convert the unixepoch and then truncate it to only date
     query = text(
         """SELECT date(created_time, 'unixepoch'), count(1) 
                  FROM uploaded_images 

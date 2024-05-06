@@ -4,11 +4,6 @@ import os
 from fastapi import Path, UploadFile, APIRouter, HTTPException, Depends, Body
 from sqlalchemy.orm import Session
 
-# from fastapi.staticfiles import StaticFiles
-# from fastapi import FileResponse
-# import aiofiles
-
-# from config import settings
 from .database import get_db
 from . import upload_url_helper, image_helper, stats_helper
 
@@ -34,30 +29,39 @@ async def upload_images(
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     uploaded_images = {}
+    # Checks if the upload id is valid or not
     if not upload_url_helper.is_valid_upload_id(db=db, upload_id=upload_id):
         raise HTTPException(status_code=404, detail="Invalid Upload Url")
+    # Iterates through the list of upload files.
     for image_file in image_files:
         log.debug("Processing file - %s", image_file.filename)
+        # Saves the incoming file to a file with its own hash as its name
+        # If the hash file already exists, we don't save it
         hashed_file_name, already_exists = await image_helper.save_image(
             input_image=image_file
         )
         if not hashed_file_name:
             raise HTTPException(status_code=500, detail="Internal Server Error")
         hashed_image_id = os.path.basename(hashed_file_name)
+        # If the image is uploaded for the first time and not a duplicate upload
         if already_exists is not None and not already_exists:
+            # adds an entry to associate it to the upload id
             image_helper.associate_image_to_upload(
                 db=db,
                 upload_id=upload_id,
                 image_id=hashed_image_id,
                 image_name=image_file.filename or "tempimgfile",
             )
+            # extract the image metadata
             img_metadata = image_helper.get_image_metadata(
                 image_file_name=hashed_file_name
             )
+            # save the image metadata , one row per tag-value combination per image
             image_helper.save_image_metadata(
                 db=db, image_id=hashed_image_id, image_metadata=img_metadata
             )
         uploaded_images[image_file.filename] = hashed_image_id
+    # returns a mapping of original filename to image id (hash of the file)
     return uploaded_images
 
 
