@@ -4,7 +4,7 @@ import datetime
 
 from sqlalchemy.orm import Session
 
-from models import UploadUrl
+from .models import UploadUrl
 
 log = logging.getLogger(__name__)
 

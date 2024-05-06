@@ -1,0 +1,21 @@
+services:
+  image_service:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./db:/code/db
+      - ./images:/code/images
+    ports:
+      - 8001:8000
+    environment:
+      - API_KEY=<YOUR-API-KEY>
+      - DB_FILE=/code/db/img_srv.db
+      - IMAGE_UPLOAD_BASEPATH=/code/images
+
+  jupyter:
+    image: jupyter/base-notebook
+    volumes:
+      - ./notebooks:/home/jovyan/
+      - ./sample_images:/home/jovyan/sample_images
+    ports:
+      - 8888:8888

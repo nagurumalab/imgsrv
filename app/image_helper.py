@@ -6,14 +6,18 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
+from PIL import JpegImagePlugin
 
-from config import settings
-from models import UploadedImage, ImageMetadata
+from .config import settings
+from .models import UploadedImage, ImageMetadata
 
 log = logging.getLogger(__name__)
 
+# To make sure JPEG are not recognised as MPO in Image.format call
+JpegImagePlugin._getmp = lambda x: None
 
-async def save_image(input_image: UploadFile) -> str | None:
+
+async def save_image(input_image: UploadFile) -> tuple[str, bool] | tuple[None, None]:
     file_name = settings.image_upload_basepath + f"/{input_image.filename}"
     hashed_file_name = None
     try:
@@ -29,6 +33,7 @@ async def save_image(input_image: UploadFile) -> str | None:
         if not os.path.isfile(hashed_file_name):
             log.debug("Renaming %s to %s", file_name, hashed_file_name)
             os.rename(file_name, hashed_file_name)
+            already_exists = False
         else:
             log.debug(
                 "Deleting %s (since there is already a file with hashed name - %s)",
@@ -36,10 +41,12 @@ async def save_image(input_image: UploadFile) -> str | None:
                 hashed_file_name,
             )
             os.remove(file_name)
-        return hashed_file_name
+            already_exists = True
+        return hashed_file_name, already_exists
     except Exception:
         # TODO: Add some clean up setup
         log.exception("Something went wrong when saving the file - %s", file_name)
+    return None, None
 
 
 def get_image_hash(image_filename: str) -> str:
@@ -59,6 +66,8 @@ def get_image_metadata(image_file_name: str):
         exif_dict[tag] = str(data)
 
     # TODO: GPSInfo needs to be translated using piexif library.
+
+    exif_dict["ImageFormat"] = image.format
     log.debug("Image Metadata (%s) - %s", image_file_name, exif_dict)
     return exif_dict
 

@@ -1,22 +1,27 @@
 import logging
-from database import create_tables
+from .database import create_tables
 
 logging.basicConfig(
     format="'%(asctime)s - %(name)s - %(levelname)s - %(message)s'",
     datefmt="%m/%d/%Y %I:%M:%S %p",
-    level="DEBUG",
+    level="INFO",
 )
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 
 
-from config import settings
-from routers import router  # , public_router
+from .config import settings
+from .auth import authenticated
+from .routers import router
 
 app = FastAPI()
-app.include_router(router=router, prefix=settings.api_path_prefix)
+app.include_router(
+    router=router,
+    prefix=settings.api_path_prefix,
+    dependencies=[Depends(authenticated)],
+)
 # app.include_router(router=secure_router, prefix="/api")
 app.mount(
     settings.static_image_url,
